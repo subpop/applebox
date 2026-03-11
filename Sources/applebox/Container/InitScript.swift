@@ -22,65 +22,65 @@ enum InitScript {
     ///    so the host can detect completion)
     /// 4. Signal-aware event loop
     static let source = """
-    set -e
+        set -e
 
-    uid="$APPLEBOX_UID"
-    guest_gid="${APPLEBOX_GUEST_GID:-1000}"
-    user="$USER"
-    home="$HOME"
-    shell="$SHELL"
+        uid="$APPLEBOX_UID"
+        guest_gid="${APPLEBOX_GUEST_GID:-1000}"
+        user="$USER"
+        home="$HOME"
+        shell="$SHELL"
 
-    if ! [ -x "$shell" ]; then
-        shell=/bin/sh
-    fi
+        if ! [ -x "$shell" ]; then
+            shell=/bin/sh
+        fi
 
-    # Primary group: name matches user (Linux convention), guest GID
-    getent group "$guest_gid" >/dev/null 2>&1 \
-        || groupadd -g "$guest_gid" "$user" 2>/dev/null || true
+        # Primary group: name matches user (Linux convention), guest GID
+        getent group "$guest_gid" >/dev/null 2>&1 \
+            || groupadd -g "$guest_gid" "$user" 2>/dev/null || true
 
-    if id "$user" >/dev/null 2>&1; then
-        usermod -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
-            2>/dev/null || true
-    else
-        useradd -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
-            2>/dev/null || true
-    fi
+        if id "$user" >/dev/null 2>&1; then
+            usermod -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
+                2>/dev/null || true
+        else
+            useradd -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
+                2>/dev/null || true
+        fi
 
-    mkdir -p "$home" && chown "$uid":"$guest_gid" "$home"
+        mkdir -p "$home" && chown "$uid":"$guest_gid" "$home"
 
-    xdg_runtime_dir="/run/user/$uid"
-    mkdir -p "$xdg_runtime_dir" && chown "$uid":"$guest_gid" "$xdg_runtime_dir"
-    printf '%s' "$guest_gid" > /run/applebox/guest_gid
-    printf '%s' "$xdg_runtime_dir" > /run/applebox/xdg_runtime_dir
+        xdg_runtime_dir="/run/user/$uid"
+        mkdir -p "$xdg_runtime_dir" && chown "$uid":"$guest_gid" "$xdg_runtime_dir"
+        printf '%s' "$guest_gid" > /run/applebox/guest_gid
+        printf '%s' "$xdg_runtime_dir" > /run/applebox/xdg_runtime_dir
 
-    usermod -aG wheel "$user" 2>/dev/null \
-        || usermod -aG sudo "$user" 2>/dev/null || true
+        usermod -aG wheel "$user" 2>/dev/null \
+            || usermod -aG sudo "$user" 2>/dev/null || true
 
-    if [ -d /etc/sudoers.d ]; then
-        echo "$user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/applebox
-        chmod 440 /etc/sudoers.d/applebox
-    fi
+        if [ -d /etc/sudoers.d ]; then
+            echo "$user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/applebox
+            chmod 440 /etc/sudoers.d/applebox
+        fi
 
-    passwd -d root 2>/dev/null || true
+        passwd -d root 2>/dev/null || true
 
-    touch /run/.appleboxenv
+        touch /run/.appleboxenv
 
-    # Write toolbox-compatible .containerenv (key=value format) for tools that parse it
-    {
-        echo "engine=container"
-        echo "name=${APPLEBOX_CONTAINER_NAME:-}"
-        echo "image=${APPLEBOX_IMAGE:-}"
-        echo "rootless=1"
-    } > /run/.containerenv
+        # Write toolbox-compatible .containerenv (key=value format) for tools that parse it
+        {
+            echo "engine=container"
+            echo "name=${APPLEBOX_CONTAINER_NAME:-}"
+            echo "image=${APPLEBOX_IMAGE:-}"
+            echo "rootless=1"
+        } > /run/.containerenv
 
-    printf '%s' "$shell" > /run/applebox/shell
-    touch /run/applebox/initialized
+        printf '%s' "$shell" > /run/applebox/shell
+        touch /run/applebox/initialized
 
-    trap 'exit 0' TERM INT
+        trap 'exit 0' TERM INT
 
-    while true; do
-        sleep 86400 &
-        wait $!
-    done
-    """
+        while true; do
+            sleep 86400 &
+            wait $!
+        done
+        """
 }
