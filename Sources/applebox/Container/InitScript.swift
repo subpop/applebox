@@ -63,8 +63,6 @@ enum InitScript {
 
         passwd -d root 2>/dev/null || true
 
-        touch /run/.appleboxenv
-
         # Write toolbox-compatible .containerenv (key=value format) for tools that parse it
         {
             echo "engine=container"
