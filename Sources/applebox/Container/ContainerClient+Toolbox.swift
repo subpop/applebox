@@ -44,7 +44,7 @@ extension ContainerClient {
             showItems: true,
             showSpeed: true,
             ignoreSmallSize: true,
-            totalTasks: 2
+            totalTasks: 1
         )
         let pullProgress = ProgressBar(config: pullConfig)
         defer { pullProgress.finish() }
@@ -65,19 +65,6 @@ extension ContainerClient {
         )
         _ = try await img.getCreateSnapshot(platform: platform, progressUpdate: mainHandler)
 
-        pullProgress.set(description: "Pulling init image")
-        let initTask = await taskManager.startTask()
-        let initHandler = ProgressTaskCoordinator.handler(for: initTask, from: pullProgress.handler)
-
-        let initImg = try await ClientImage.fetch(
-            reference: ClientImage.initImageRef,
-            platform: .current,
-            scheme: scheme,
-            progressUpdate: initHandler,
-            maxConcurrentDownloads: 3,
-        )
-        _ = try await initImg.getCreateSnapshot(
-            platform: ContainerizationOCI.Platform.current, progressUpdate: initHandler)
         await taskManager.finish()
         pullProgress.finish()
 
