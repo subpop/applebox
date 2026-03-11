@@ -18,7 +18,6 @@ import Containerization
 import ContainerizationOCI
 import Foundation
 import Logging
-import TerminalProgress
 
 enum ToolboxLabel {
     static let managed = "dev.applebox.managed"
@@ -27,46 +26,11 @@ enum ToolboxLabel {
 extension ContainerClient {
     func createToolbox(
         name: String,
-        imageReference: String,
+        image: ClientImage,
     ) async throws {
         try Utility.validEntityName(name)
 
         let platform = Parser.platform(os: "linux", arch: Arch.hostArchitecture().rawValue)
-        let scheme = try RequestScheme("auto")
-
-        Applebox.logger.debug(
-            "pulling image",
-            metadata: ["imageReference": "\(imageReference)", "platform": "\(platform)"])
-
-        let pullConfig = try ProgressConfig(
-            showTasks: true,
-            showProgressBar: true,
-            showItems: true,
-            showSpeed: true,
-            ignoreSmallSize: true,
-            totalTasks: 1
-        )
-        let pullProgress = ProgressBar(config: pullConfig)
-        defer { pullProgress.finish() }
-        pullProgress.start()
-        pullProgress.set(description: "Pulling image")
-        pullProgress.set(itemsName: "blobs")
-
-        let taskManager = ProgressTaskCoordinator()
-        let mainTask = await taskManager.startTask()
-        let mainHandler = ProgressTaskCoordinator.handler(for: mainTask, from: pullProgress.handler)
-
-        let img = try await ClientImage.fetch(
-            reference: imageReference,
-            platform: platform,
-            scheme: scheme,
-            progressUpdate: mainHandler,
-            maxConcurrentDownloads: 3,
-        )
-        _ = try await img.getCreateSnapshot(platform: platform, progressUpdate: mainHandler)
-
-        await taskManager.finish()
-        pullProgress.finish()
 
         Applebox.logger.debug("fetching default kernel")
         let kernel = try await ClientKernel.getDefaultKernel(for: .current)
@@ -78,7 +42,7 @@ extension ContainerClient {
         let containerHome = ToolboxPaths.containerHomeDirectory(userName: userName)
         let hostHomeInContainer = ToolboxPaths.containerMountPointForHostHome(userName: userName)
 
-        let imageConfig = try await img.config(for: platform).config
+        let imageConfig = try await image.config(for: platform).config
         var environment = imageConfig?.env ?? []
         let toolboxOverrides: [(String, String)] = [
             ("HOME", containerHome),
@@ -89,7 +53,7 @@ extension ContainerClient {
             ("APPLEBOX_UID", "\(uid)"),
             ("APPLEBOX_GUEST_GID", "1000"),
             ("APPLEBOX_CONTAINER_NAME", name),
-            ("APPLEBOX_IMAGE", imageReference),
+            ("APPLEBOX_IMAGE", image.reference),
             ("XDG_RUNTIME_DIR", "/run/user/\(uid)"),
         ]
         for (key, value) in toolboxOverrides {
@@ -111,7 +75,7 @@ extension ContainerClient {
         Applebox.logger.debug(
             "configuring container", metadata: ["name": "\(name)", "runDir": "\(runDir.path)"])
 
-        var config = ContainerConfiguration(id: name, image: img.description, process: initProcess)
+        var config = ContainerConfiguration(id: name, image: image.description, process: initProcess)
         config.platform = platform
         config.useInit = true
         config.ssh = true

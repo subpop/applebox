@@ -14,9 +14,11 @@
 
 import ArgumentParser
 import ContainerAPIClient
+import ContainerResource
 import ContainerizationOCI
 import Foundation
 import Logging
+import TerminalProgress
 
 struct Create: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -88,8 +90,45 @@ struct Create: AsyncParsableCommand {
                 "imageReference": "\(imageRef)",
             ])
 
+        let platform = Parser.platform(os: "linux", arch: Arch.hostArchitecture().rawValue)
+        let scheme = try RequestScheme("auto")
+
+        Applebox.logger.debug(
+            "pulling image",
+            metadata: ["imageReference": "\(imageRef)", "platform": "\(platform)"])
+
+        let pullConfig = try ProgressConfig(
+            showTasks: true,
+            showProgressBar: true,
+            showItems: true,
+            showSpeed: true,
+            ignoreSmallSize: true,
+            totalTasks: 1
+        )
+        let pullProgress = ProgressBar(config: pullConfig)
+        defer { pullProgress.finish() }
+        pullProgress.start()
+        pullProgress.set(description: "Pulling image")
+        pullProgress.set(itemsName: "blobs")
+
+        let taskManager = ProgressTaskCoordinator()
+        let mainTask = await taskManager.startTask()
+        let mainHandler = ProgressTaskCoordinator.handler(for: mainTask, from: pullProgress.handler)
+
+        let img = try await ClientImage.fetch(
+            reference: imageRef,
+            platform: platform,
+            scheme: scheme,
+            progressUpdate: mainHandler,
+            maxConcurrentDownloads: 3,
+        )
+        _ = try await img.getCreateSnapshot(platform: platform, progressUpdate: mainHandler)
+
+        await taskManager.finish()
+        pullProgress.finish()
+
         let client = ContainerClient()
-        try await client.createToolbox(name: name, imageReference: imageRef)
+        try await client.createToolbox(name: name, image: img)
         Applebox.logger.debug("toolbox created successfully", metadata: ["name": "\(name)"])
         print(name)
     }
