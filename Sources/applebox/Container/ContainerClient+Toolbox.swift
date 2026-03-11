@@ -114,26 +114,19 @@ extension ContainerClient {
         var config = ContainerConfiguration(id: name, image: img.description, process: initProcess)
         config.platform = platform
         config.useInit = true
+        config.ssh = true
         config.resources = try Parser.resources(cpus: nil, memory: nil)
 
         config.labels = [
             ToolboxLabel.managed: "true"
         ]
 
-        var mounts: [Filesystem] = [
+        config.mounts = [
             .virtiofs(source: hostHome, destination: hostHomeInContainer, options: []),
             .virtiofs(
                 source: runDir.path, destination: ToolboxPaths.containerRuntimeMountPoint,
                 options: []),
         ]
-        if let hostSSH = ToolboxPaths.hostSSHDirectoryIfPresent {
-            mounts.append(
-                .virtiofs(
-                    source: hostSSH.path,
-                    destination: ToolboxPaths.containerSSHDirectory(userName: userName),
-                    options: []))
-        }
-        config.mounts = mounts
 
         guard let builtin = try await ClientNetwork.builtin else {
             throw AppleboxError.builtinNetworkNotPresent
