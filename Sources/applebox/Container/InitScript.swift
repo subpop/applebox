@@ -24,8 +24,7 @@ enum InitScript {
     static let source = """
         set -e
 
-        uid="$APPLEBOX_UID"
-        guest_gid="${APPLEBOX_GUEST_GID:-1000}"
+        uid="$HOST_UID"
         user="$USER"
         home="$HOME"
         shell="$SHELL"
@@ -34,27 +33,13 @@ enum InitScript {
             shell=/bin/sh
         fi
 
-        # Primary group: name matches user (Linux convention), guest GID
-        getent group "$guest_gid" >/dev/null 2>&1 \
-            || groupadd -g "$guest_gid" "$user" 2>/dev/null || true
-
         if id "$user" >/dev/null 2>&1; then
-            usermod -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
+            usermod --uid "$uid" --home-dir "$home" --create-home --shell "$shell" "$user" \
                 2>/dev/null || true
         else
-            useradd -u "$uid" -g "$guest_gid" -d "$home" -s "$shell" "$user" \
+            useradd --uid "$uid" --home-dir "$home" --create-home --shell "$shell" "$user" \
                 2>/dev/null || true
         fi
-
-        mkdir -p "$home" && chown "$uid":"$guest_gid" "$home"
-
-        xdg_runtime_dir="/run/user/$uid"
-        mkdir -p "$xdg_runtime_dir" && chown "$uid":"$guest_gid" "$xdg_runtime_dir"
-        printf '%s' "$guest_gid" > /run/applebox/guest_gid
-        printf '%s' "$xdg_runtime_dir" > /run/applebox/xdg_runtime_dir
-
-        usermod -aG wheel "$user" 2>/dev/null \
-            || usermod -aG sudo "$user" 2>/dev/null || true
 
         if [ -d /etc/sudoers.d ]; then
             echo "$user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/applebox
@@ -71,6 +56,7 @@ enum InitScript {
             echo "rootless=1"
         } > /run/.containerenv
 
+        printf '%s' "$(id -g $user)" > /run/applebox/guest_gid
         printf '%s' "$shell" > /run/applebox/shell
         touch /run/applebox/initialized
 

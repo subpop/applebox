@@ -45,15 +45,13 @@ struct Enter: AsyncParsableCommand {
         let snapshot = try await client.ensureRunning(id: name)
 
         let shellPath = ToolboxPaths.resolvedShell(for: name)
-        let containerHome = ToolboxPaths.containerHomeDirectory(
-            userName: ProcessInfo.processInfo.userName)
 
         Applebox.logger.debug(
             "starting shell in container",
             metadata: [
                 "container": "\(name)",
                 "shell": "\(shellPath)",
-                "workingDirectory": "\(containerHome)",
+                "workingDirectory": "\(FileManager.default.currentDirectoryPath)",
             ])
 
         var config = snapshot.configuration.initProcess
@@ -61,7 +59,7 @@ struct Enter: AsyncParsableCommand {
         config.arguments = ["-l"]
         config.terminal = true
         config.user = .id(uid: getuid(), gid: ToolboxPaths.resolvedGuestGid(for: name))
-        config.workingDirectory = containerHome
+        config.workingDirectory = FileManager.default.currentDirectoryPath
         config.environment.removeAll { $0.hasPrefix("SHELL=") }
         config.environment.append("SHELL=\(shellPath)")
 

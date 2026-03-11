@@ -82,11 +82,6 @@ enum ToolboxPaths {
         "/home/\(userName)"
     }
 
-    /// Path inside the container where the host home directory is mounted (virtiofs destination).
-    static func containerMountPointForHostHome(userName: String) -> String {
-        "/Users/\(userName)"
-    }
-
     /// Path inside the container for the user's `.ssh` directory (i.e. `$HOME/.ssh`).
     /// When host ``hostSSHDirectoryIfPresent`` is non-nil, it is mounted here so SSH keys are available.
     static func containerSSHDirectory(userName: String) -> String {

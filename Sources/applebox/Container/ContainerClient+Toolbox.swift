@@ -15,6 +15,7 @@
 import ContainerAPIClient
 import ContainerResource
 import Containerization
+import ContainerizationError
 import ContainerizationOCI
 import Foundation
 import Logging
@@ -31,8 +32,6 @@ extension ContainerClient {
         try Utility.validEntityName(name)
 
         let platform = Parser.platform(os: "linux", arch: Arch.hostArchitecture().rawValue)
-
-        Applebox.logger.debug("fetching default kernel")
         let kernel = try await ClientKernel.getDefaultKernel(for: .current)
 
         let uid = getuid()
@@ -40,21 +39,19 @@ extension ContainerClient {
         let hostHome = ToolboxPaths.hostHomeDirectory.path
         let hostShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/sh"
         let containerHome = ToolboxPaths.containerHomeDirectory(userName: userName)
-        let hostHomeInContainer = ToolboxPaths.containerMountPointForHostHome(userName: userName)
 
+        // Customize environment with local values
         let imageConfig = try await image.config(for: platform).config
         var environment = imageConfig?.env ?? []
         let toolboxOverrides: [(String, String)] = [
             ("HOME", containerHome),
             ("SHELL", hostShell),
             ("USER", userName),
-            ("LANG", "C.UTF-8"),
-            ("TERM", "xterm-256color"),
-            ("APPLEBOX_UID", "\(uid)"),
-            ("APPLEBOX_GUEST_GID", "1000"),
+            ("LANG", ProcessInfo.processInfo.environment["LANG"] ?? "C.UTF-8"),
+            ("TERM", ProcessInfo.processInfo.environment["TERM"] ?? "xterm-256color"),
+            ("HOST_UID", "\(uid)"),
             ("APPLEBOX_CONTAINER_NAME", name),
             ("APPLEBOX_IMAGE", image.reference),
-            ("XDG_RUNTIME_DIR", "/run/user/\(uid)"),
         ]
         for (key, value) in toolboxOverrides {
             environment.removeAll { $0.hasPrefix("\(key)=") }
@@ -70,12 +67,36 @@ extension ContainerClient {
             user: .id(uid: 0, gid: 0),
         )
 
+        // Get or create the container home volume
+        let containerHomeVolume: Volume
+        do {
+            containerHomeVolume = try await ClientVolume.create(
+                name: "\(name)-home",
+                driver: "local",
+                driverOpts: [:],
+                labels: [ToolboxLabel.managed: "true"]
+            )
+        } catch let error as VolumeError {
+            guard case .volumeAlreadyExists = error else {
+                throw error
+            }
+            // Volume already exists, just inspect it
+            containerHomeVolume = try await ClientVolume.inspect("\(name)-home")
+        } catch let error as ContainerizationError {
+            // Handle XPC-wrapped volumeAlreadyExists error
+            guard error.message.contains("already exists") else {
+                throw error
+            }
+            containerHomeVolume = try await ClientVolume.inspect("\(name)-home")
+        }
+
         let runDir = try ToolboxPaths.ensureHostRuntimeDirectory(for: name)
 
         Applebox.logger.debug(
             "configuring container", metadata: ["name": "\(name)", "runDir": "\(runDir.path)"])
 
-        var config = ContainerConfiguration(id: name, image: image.description, process: initProcess)
+        var config = ContainerConfiguration(
+            id: name, image: image.description, process: initProcess)
         config.platform = platform
         config.useInit = true
         config.ssh = true
@@ -85,13 +106,19 @@ extension ContainerClient {
             ToolboxLabel.managed: "true"
         ]
 
+        // Set up mounts
         config.mounts = [
-            .virtiofs(source: hostHome, destination: hostHomeInContainer, options: []),
+            .volume(
+                name: containerHomeVolume.name, format: containerHomeVolume.format,
+                source: containerHomeVolume.source, destination: "/home",
+                options: []),
+            .virtiofs(source: hostHome, destination: hostHome, options: []),
             .virtiofs(
                 source: runDir.path, destination: ToolboxPaths.containerRuntimeMountPoint,
                 options: []),
         ]
 
+        // Set up networking
         guard let builtin = try await ClientNetwork.builtin else {
             throw AppleboxError.builtinNetworkNotPresent
         }
