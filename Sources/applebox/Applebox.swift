@@ -42,6 +42,7 @@ struct Applebox: AsyncParsableCommand {
             Create.self,
             Enter.self,
             List.self,
+            Run.self,
             Rm.self,
         ],
         defaultSubcommand: nil,

@@ -8,6 +8,7 @@
 
 - **Create** persistent containers from Fedora, Ubuntu, Arch, or RHEL toolbox images, or any OCI image
 - **Enter** an interactive shell with your host UID/GID, `$HOME` bind-mounted, and `$SHELL` preserved
+- **Run** a single command in a container
 - **List** containers with name, start time, status, and image
 - **Remove** containers (with optional force) and clean up runtime data
 - Configurable **log level** (`--log-level`) for debugging
@@ -100,6 +101,13 @@ Enter the default container (Fedora 42) or a named one:
 ```bash
 box enter
 box enter my-ubuntu
+```
+
+Run a single command in a container (default or named):
+
+```bash
+box run my-ubuntu cat /etc/os-release
+echo "hello" | box run my-ubuntu cat
 ```
 
 List containers:
