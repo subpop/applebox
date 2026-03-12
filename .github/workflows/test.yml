@@ -18,10 +18,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+      - name: Select Xcode (Apple Swift)
+        uses: maxim-lobanov/setup-xcode@v1
         with:
-          swift-version: "6.2"
+          xcode-version: latest-stable
 
       - name: Build
         run: swift build
