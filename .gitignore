@@ -5,3 +5,4 @@ DerivedData/
 *.xcscmblueprint
 .netrc
 .cursor
+opencode.json
