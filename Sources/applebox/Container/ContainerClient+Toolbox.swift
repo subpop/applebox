@@ -129,10 +129,10 @@ extension ContainerClient {
                 options: AttachmentOptions(hostname: name, macAddress: nil),
             )
         ]
-        if case .running(_, let status) = builtin {
-            Applebox.logger.debug("network status", metadata: ["ipv4Gateway": "\(status)"])
-            config.dns = .init(nameservers: [status.ipv4Gateway.description])
-        }
+        // Use empty nameservers so the sandbox service dynamically resolves
+        // the gateway IP from the allocated network attachment at every boot.
+        // This prevents stale DNS when the host NAT subnet changes.
+        config.dns = .init(nameservers: [])
 
         try await create(
             configuration: config,
