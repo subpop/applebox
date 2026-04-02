@@ -8,8 +8,8 @@ let package = Package(
         .executable(name: "box", targets: ["Applebox"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/container.git", "0.10.0"..<"0.11.0"),
-        .package(url: "https://github.com/apple/containerization.git", "0.26.0"..<"0.27.0"),
+        .package(url: "https://github.com/apple/container.git", "0.11.0"..<"0.12.0"),
+        .package(url: "https://github.com/apple/containerization.git", "0.29.0"..<"0.30.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.10.0"),
     ],
