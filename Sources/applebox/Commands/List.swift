@@ -30,7 +30,7 @@ struct List: AsyncParsableCommand {
         Applebox.logger.debug("list command started")
         let client = ContainerClient()
 
-        let snapshots = try await client.list()
+        let snapshots = try await client.list(filters: .init(labels: [ToolboxLabel.managed: "true"]))
         Applebox.logger.debug("listed containers", metadata: ["count": "\(snapshots.count)"])
         if !snapshots.isEmpty {
             var rows: [[String]] = [["CONTAINER NAME", "STARTED", "STATUS", "IMAGE NAME"]]
