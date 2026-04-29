@@ -18,6 +18,7 @@ let package = Package(
             name: "Applebox",
             dependencies: [
                 .product(name: "ContainerAPIClient", package: "container"),
+                .product(name: "ContainerCommands", package: "container"),
                 .product(name: "ContainerResource", package: "container"),
                 .product(name: "TerminalProgress", package: "container"),
                 .product(name: "Containerization", package: "containerization"),

@@ -14,6 +14,7 @@
 
 import ArgumentParser
 import ContainerAPIClient
+import ContainerCommands
 import Foundation
 import Logging
 
