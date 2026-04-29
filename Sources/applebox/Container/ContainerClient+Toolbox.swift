@@ -119,10 +119,11 @@ extension ContainerClient {
         ]
 
         // Set up networking
-        guard let builtin = try await ClientNetwork.builtin else {
+        let networkClient = NetworkClient()
+        guard let builtin = try await networkClient.builtin else {
             throw AppleboxError.builtinNetworkNotPresent
         }
-        Applebox.logger.debug("network state", metadata: ["network": "\(builtin)"])
+        Applebox.logger.debug("network state", metadata: ["network": "\(builtin.id)"])
         config.networks = [
             AttachmentConfiguration(
                 network: builtin.id,
