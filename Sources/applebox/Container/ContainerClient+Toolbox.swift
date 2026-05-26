@@ -156,7 +156,11 @@ extension ContainerClient {
             try? FileManager.default.removeItem(at: stampURL)
 
             let stdio: [FileHandle?] = [nil, nil, nil]
-            let process = try await bootstrap(id: id, stdio: stdio)
+            var dynamicEnv: [String: String] = [:]
+            if let sshAuthSock = ProcessInfo.processInfo.environment["SSH_AUTH_SOCK"] {
+                dynamicEnv["SSH_AUTH_SOCK"] = sshAuthSock
+            }
+            let process = try await bootstrap(id: id, stdio: stdio, dynamicEnv: dynamicEnv)
             try await process.start()
             container = try await get(id: id)
             guard container.status == .running else {
