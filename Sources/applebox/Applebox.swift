@@ -37,7 +37,7 @@ struct Applebox: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "box",
         abstract: "Persistent Linux development containers for macOS",
-        version: "0.1.5",
+        version: "0.2.0",
         subcommands: [
             Create.self,
             Enter.self,
