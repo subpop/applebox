@@ -78,8 +78,8 @@ struct Create: AsyncParsableCommand {
             return (
                 image,
                 container
-                    ?? "\(lastPathComponent)-\(ref.tag ?? "latest")".replacingOccurrences(
-                        of: "/", with: "-"),
+                    ?? "\(lastPathComponent)-\(ref.tag ?? "latest")".replacing(
+                        "/", with: "-"),
             )
         }()
 
