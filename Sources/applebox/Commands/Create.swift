@@ -14,6 +14,7 @@
 
 import ArgumentParser
 import ContainerAPIClient
+import ContainerPersistence
 import ContainerResource
 import ContainerizationOCI
 import Foundation
@@ -119,6 +120,7 @@ struct Create: AsyncParsableCommand {
             reference: imageRef,
             platform: platform,
             scheme: scheme,
+            containerSystemConfig: ContainerSystemConfig(),
             progressUpdate: mainHandler,
             maxConcurrentDownloads: 3,
         )

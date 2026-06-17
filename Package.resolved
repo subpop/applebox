@@ -1,5 +1,5 @@
 {
-  "originHash" : "4dc5870e7cd9614f0c5c26368048c711bc3a1f76a3fec2e4c4150bbd62c4a3d0",
+  "originHash" : "aed2f3d210b048f9a9539e6c7cca4a88af9e6685d9f08fd0e1393657166d2e60",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/container.git",
       "state" : {
-        "revision" : "e9891b3cfe1f8c9d227859aa95375d99b32e11ac",
-        "version" : "0.12.1"
+        "revision" : "ee848e3ebfd7c73b04dd419683be54fb450b8779",
+        "version" : "1.0.0"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/containerization.git",
       "state" : {
-        "revision" : "f1ee6f8b737ab8dffbd620bfa47283f6f0bc1822",
-        "version" : "0.31.0"
+        "revision" : "a2a1add6c7e1a1665e5397edc49d925c49090b3a",
+        "version" : "0.33.3"
       }
     },
     {
@@ -128,6 +128,15 @@
       }
     },
     {
+      "identity" : "swift-configuration-toml",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/swift-configuration-toml",
+      "state" : {
+        "revision" : "4ea16b4dfa4b023cecae5ae0368402c4d846d613",
+        "version" : "2.0.0"
+      }
+    },
+    {
       "identity" : "swift-crypto",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
@@ -170,6 +179,15 @@
       "state" : {
         "revision" : "5073617dac96330a486245e4c0179cb0a6fd2256",
         "version" : "1.12.0"
+      }
+    },
+    {
+      "identity" : "swift-metrics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-metrics",
+      "state" : {
+        "revision" : "087e8074afa97040c3b870c8664fe5482fb87cc4",
+        "version" : "2.11.0"
       }
     },
     {

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import ContainerAPIClient
+import ContainerPersistence
 import ContainerResource
 import Containerization
 import ContainerizationError
@@ -74,7 +75,7 @@ extension ContainerClient {
         )
 
         // Get or create the container home volume
-        let containerHomeVolume: Volume
+        let containerHomeVolume: VolumeConfiguration
         do {
             containerHomeVolume = try await ClientVolume.create(
                 name: "\(name)-home",
@@ -107,7 +108,10 @@ extension ContainerClient {
             id: name, image: image.description, process: initProcess)
         config.platform = platform
         config.ssh = true
-        config.resources = try Parser.resources(cpus: nil, memory: nil)
+        config.resources = try Parser.resources(
+            cpus: nil, memory: nil,
+            defaultCPUs: ContainerConfig.defaultCPUs,
+            defaultMemory: ContainerConfig.defaultMemory)
 
         config.labels = [
             ToolboxLabel.managed: "true"
