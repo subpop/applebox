@@ -83,8 +83,7 @@ Swift Argument Parser: `create`, `enter`, `run`, `list`, and `rm`.
 
 ## Build & Test
 
-- Build: `make` (or `swift build`). The Makefile builds and codesigns the
-  binary with the `com.apple.security.virtualization` entitlement.
+- Build: `make` (or `swift build`).
 - Install: `make install` (installs to `/usr/local/bin/box` by default;
   override with `INSTALL_PREFIX`).
 - Run tests: `swift test`.

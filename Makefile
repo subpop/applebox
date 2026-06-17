@@ -1,21 +1,16 @@
 BINARY = box
 PROFILE ?= debug
 BUILD_DIR = .build/$(PROFILE)
-ENTITLEMENTS = applebox.entitlements
 INSTALL_PREFIX ?= /usr/local
 
 SWIFT = $(shell xcrun -f swift)
-CODESIGN = $(shell xcrun --find codesign)
 
-.PHONY: all build sign install clean
+.PHONY: all build install clean
 
-all: build sign
+all: build
 
 build:
 	$(SWIFT) build -c $(PROFILE)
-
-sign: build
-	$(CODESIGN) --force --sign - --entitlements $(ENTITLEMENTS) $(BUILD_DIR)/$(BINARY)
 
 install: all
 	install -d $(INSTALL_PREFIX)/bin
