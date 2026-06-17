@@ -90,7 +90,9 @@ enum ToolboxPaths {
     // MARK: - Container paths
 
     /// Mount point inside the container where the host runtime directory is visible.
-    static let containerRuntimeMountPoint = "/run/applebox"
+    /// Uses /var/lib/applebox rather than /run/applebox because systemd remounts
+    /// /run as tmpfs during early boot, hiding any virtiofs mounts underneath it.
+    static let containerRuntimeMountPoint = "/var/lib/applebox"
 
     /// Mount point inside the container for the applebox sbin scripts (init, create-user).
     static let containerSbinMountPoint = "/sbin.applebox"
@@ -146,7 +148,7 @@ enum ToolboxPaths {
 
         set -e
 
-        INITIALIZED=/run/applebox/initialized
+        INITIALIZED=/var/lib/applebox/initialized
         CUSTOM_SETUP=/etc/applebox/create-user.sh
         DEFAULT_SETUP=/sbin.applebox/create-user.sh
 

@@ -19,5 +19,5 @@ public enum AppleboxError: Error, Sendable {
     case containerInvalidState(String)
     case invalidRelease(String)
     case mutuallyExclusiveFlags(String)
-    case userSetupFailed(String)
+    case userSetupFailed(String, exitCode: Int32)
 }

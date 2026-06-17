@@ -116,6 +116,9 @@ extension ContainerClient {
         config.labels = [
             ToolboxLabel.managed: "true"
         ]
+        // Toolbox containers run a full init system (systemd, OpenRC) and act as
+        // persistent development environments, so they need all capabilities.
+        config.capAdd = ["ALL"]
 
         // Set up mounts
         config.mounts = [
@@ -229,7 +232,7 @@ extension ContainerClient {
 
         let exitCode = try await io.handleProcess(process: process, log: Applebox.logger)
         guard exitCode == 0 else {
-            throw AppleboxError.userSetupFailed(id)
+            throw AppleboxError.userSetupFailed(id, exitCode: exitCode)
         }
         Applebox.logger.debug("user setup complete", metadata: ["id": "\(id)"])
     }
