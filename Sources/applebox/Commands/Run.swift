@@ -56,15 +56,17 @@ struct Run: AsyncParsableCommand {
         Applebox.logger.debug("ensuring container is running", metadata: ["container": "\(name)"])
         let snapshot = try await client.ensureRunning(id: name)
 
+        // Ensure first-time user setup has been performed
+        try await client.ensureUserSetup(id: name, snapshot: snapshot)
+
+        // Use the init script in shell mode (-s command args...) to resolve the
+        // distro-appropriate shell and run the command through it.
         var config = snapshot.configuration.initProcess
-        config.executable = command[0]
-        config.arguments = Array(command.dropFirst())
+        config.executable = ToolboxPaths.containerInitPath
+        config.arguments = ["-s"] + command
         config.terminal = false
-        config.user = .id(uid: getuid(), gid: ToolboxPaths.resolvedGuestGid(for: name))
-        config.workingDirectory = FileManager.default.currentDirectoryPath
-        config.environment.removeAll { $0.hasPrefix("SHELL=") }
-        let shellPath = ToolboxPaths.resolvedShell(for: name)
-        config.environment.append("SHELL=\(shellPath)")
+        config.user = .id(uid: getuid(), gid: getgid())
+        config.workingDirectory = ToolboxPaths.resolvedWorkingDirectory()
 
         let io = try ProcessIO.create(tty: false, interactive: true, detach: false)
         defer { try? io.close() }

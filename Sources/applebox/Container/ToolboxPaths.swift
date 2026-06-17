@@ -19,12 +19,20 @@ import Foundation
 enum ToolboxPaths {
     // MARK: - Host paths
 
-    /// Per-container directory on the host, shared into the container at
-    /// ``containerRuntimeMountPoint`` via virtiofs. The init script writes its
-    /// initialization stamp and shell path here so the host can detect completion.
-    static func hostRuntimeDirectory(for name: String) -> URL {
+    /// Root cache directory for applebox state.
+    private static var hostCacheRoot: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Caches/dev.applebox/\(name)")
+            .appending(
+                path: "Library/Caches/dev.applebox",
+                directoryHint: .isDirectory
+            )
+    }
+
+    /// Per-container directory on the host, shared into the container at
+    /// ``containerRuntimeMountPoint`` via virtiofs. The user setup script writes an
+    /// initialization stamp here so the host can detect first-run completion.
+    static func hostRuntimeDirectory(for name: String) -> URL {
+        hostCacheRoot.appending(path: name, directoryHint: .isDirectory)
     }
 
     /// Creates the host runtime directory for the given container name if needed; returns its URL.
@@ -39,35 +47,44 @@ enum ToolboxPaths {
         FileManager.default.homeDirectoryForCurrentUser
     }
 
-    /// Path to the host user's `.ssh` directory. Mounted into the container at
-    /// ``containerSSHDirectory(userName:)`` when present so `~/.ssh` works for ssh/git.
-    static var hostSSHDirectory: URL {
-        hostHomeDirectory.appendingPathComponent(".ssh", isDirectory: true)
-    }
-
-    /// Returns the host `.ssh` URL if it exists and is a directory; otherwise nil.
-    static var hostSSHDirectoryIfPresent: URL? {
-        let url = hostSSHDirectory
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
-            isDir.boolValue
-        else { return nil }
-        return url
-    }
-
-    /// URL of the "shell" file in the host runtime dir (written by init; contains resolved shell path).
-    static func hostRuntimeShellFile(for name: String) -> URL {
-        hostRuntimeDirectory(for: name).appendingPathComponent("shell")
-    }
-
-    /// URL of the "initialized" stamp file in the host runtime dir (created when init completes).
+    /// URL of the "initialized" stamp file in the host runtime dir (created on first user setup).
     static func hostInitializedStampURL(for name: String) -> URL {
-        hostRuntimeDirectory(for: name).appendingPathComponent("initialized")
+        hostRuntimeDirectory(for: name)
+            .appending(path: "initialized", directoryHint: .notDirectory)
     }
 
-    /// URL of the "guest_gid" file in the host runtime dir (written by init; guest primary GID).
-    static func hostRuntimeGuestGidFile(for name: String) -> URL {
-        hostRuntimeDirectory(for: name).appendingPathComponent("guest_gid")
+    // MARK: - Host sbin directory
+
+    /// Shared directory on the host containing the init and create-user scripts, mounted
+    /// read-only into every container at ``containerSbinMountPoint``.
+    static var hostSbinDirectory: URL {
+        hostCacheRoot
+            .appending(path: "sbin.applebox", directoryHint: .isDirectory)
+    }
+
+    /// Materializes the init and create-user scripts into ``hostSbinDirectory`` if they
+    /// are missing or out of date, so they can be bind-mounted into the container.
+    static func ensureHostSbinDirectory() throws -> URL {
+        let dir = hostSbinDirectory
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let initDest = dir.appending(path: "init", directoryHint: .notDirectory)
+        let setupDest = dir.appending(
+            path: "create-user.sh",
+            directoryHint: .notDirectory
+        )
+
+        // Always overwrite so running containers pick up script changes after
+        // an applebox upgrade.
+        try initScriptSource.write(to: initDest, atomically: true, encoding: .utf8)
+        try createUserScriptSource.write(to: setupDest, atomically: true, encoding: .utf8)
+
+        // Ensure executable
+        let fm = FileManager.default
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: initDest.path)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: setupDest.path)
+
+        return dir
     }
 
     // MARK: - Container paths
@@ -75,44 +92,148 @@ enum ToolboxPaths {
     /// Mount point inside the container where the host runtime directory is visible.
     static let containerRuntimeMountPoint = "/run/applebox"
 
+    /// Mount point inside the container for the applebox sbin scripts (init, create-user).
+    static let containerSbinMountPoint = "/sbin.applebox"
+
+    /// Path to the init script inside the container.
+    static let containerInitPath = "\(containerSbinMountPoint)/init"
+
     /// Home directory used inside the container. Distinct from the host home so that Linux
-    /// executables and config work correctly; the host home is still mounted at
-    /// ``containerMountPointForHostHome(userName:)`` for access.
+    /// executables and config work correctly; the host home is still mounted separately
+    /// for direct file access.
     static func containerHomeDirectory(userName: String) -> String {
         "/home/\(userName)"
     }
 
-    /// Path inside the container for the user's `.ssh` directory (i.e. `$HOME/.ssh`).
-    /// When host ``hostSSHDirectoryIfPresent`` is non-nil, it is mounted here so SSH keys are available.
-    static func containerSSHDirectory(userName: String) -> String {
-        "\(containerHomeDirectory(userName: userName))/.ssh"
-    }
-
     // MARK: - Resolution
 
-    /// Shell path to use when entering the container. Reads the path resolved by the init script
-    /// from the host runtime dir; falls back to host `$SHELL` (then `/bin/sh`) when the file
-    /// is missing, e.g. for containers created before this feature.
-    static func resolvedShell(for name: String) -> String {
-        let shellFile = hostRuntimeShellFile(for: name)
-        if let contents = try? String(contentsOf: shellFile, encoding: .utf8),
-            !contents.isEmpty
-        {
-            return contents
+    /// Returns the working directory to use inside the container. If the host CWD
+    /// is under the user's home directory (which is mounted into the container),
+    /// mirrors it inside the container. Otherwise falls back to the user's container
+    /// home directory.
+    static func resolvedWorkingDirectory() -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let cwd = FileManager.default.currentDirectoryPath
+        if cwd.hasPrefix(home) {
+            return cwd
         }
-        return ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/sh"
+        let userName = ProcessInfo.processInfo.userName
+        return containerHomeDirectory(userName: userName)
     }
 
-    /// Guest primary GID to use when entering the container. Reads the value written by the init
-    /// script so the process runs with the guest's user-named primary group; falls back to host
-    /// `getgid()` for containers created before the guest primary group feature.
-    static func resolvedGuestGid(for name: String) -> UInt32 {
-        let file = hostRuntimeGuestGidFile(for: name)
-        guard let contents = try? String(contentsOf: file, encoding: .utf8),
-            let gid = UInt32(contents.trimmingCharacters(in: .whitespacesAndNewlines))
-        else {
-            return getgid()
-        }
-        return gid
-    }
+    // MARK: - Script sources
+
+    /// The init script source, embedded as a string constant so it can be written to disk
+    /// at runtime without requiring SPM resource bundling.
+    static let initScriptSource = """
+        #!/bin/sh
+        #
+        # Applebox init script — the first process (PID 1) executed when a container
+        # boots. Performs container-specific setup before handing off to the real
+        # system init.
+        #
+        #   Boot mode (no flags):
+        #     Sets the hostname, writes .containerenv, fixes SSH socket ownership,
+        #     and execs /sbin/init to hand off to the real system init.
+        #
+        #   Shell mode (-s [command...]):
+        #     Resolves the user's shell from /etc/passwd with distro-aware fallbacks,
+        #     then execs into it.
+        #
+        #   User setup mode (-u):
+        #     Creates the container user on first run via create-user.sh.
+        #
+
+        set -e
+
+        INITIALIZED=/run/applebox/initialized
+        CUSTOM_SETUP=/etc/applebox/create-user.sh
+        DEFAULT_SETUP=/sbin.applebox/create-user.sh
+
+        # Resolve distro-appropriate default shell
+        . /etc/os-release 2>/dev/null || true
+        case "${ID:-}" in
+            ubuntu|debian)
+                SHELL=$(unset DSHELL; . /etc/adduser.conf 2>/dev/null \\
+                    && [ -n "${DSHELL:-}" ] \\
+                    && echo "${DSHELL}") || SHELL=/bin/bash ;;
+            *)
+                SHELL=$(unset SHELL; . /etc/default/useradd 2>/dev/null \\
+                    && [ -n "${SHELL:-}" ] \\
+                    && echo "${SHELL}") || SHELL=/bin/sh ;;
+        esac
+        export CONTAINER_SHELL=${SHELL}
+
+        if [ "$1" = "-s" ]; then
+            # Shell mode: resolve user's shell, exec into it
+            shift
+            USER_SHELL=$(grep "^$(id -un):" /etc/passwd 2>/dev/null | cut -d: -f7)
+            if [ $# -gt 0 ]; then
+                exec "${USER_SHELL:-${SHELL}}" -c "$*"
+            else
+                exec "${USER_SHELL:-${SHELL}}" -l
+            fi
+        elif [ "$1" = "-u" ]; then
+            # User setup mode: create user if not exists
+            if ! id "${APPLEBOX_USER}" >/dev/null 2>&1; then
+                if [ -f "${CUSTOM_SETUP}" ]; then
+                    ${CUSTOM_SETUP}
+                else
+                    ${DEFAULT_SETUP}
+                fi
+            fi
+            echo 1 > ${INITIALIZED}
+        else
+            # Boot mode: set hostname, write containerenv, exec real init
+            echo "${APPLEBOX_CONTAINER_NAME}" > /etc/hostname
+
+            if [ -S "${SSH_AUTH_SOCK:-}" ]; then
+                chown "${APPLEBOX_UID}:${APPLEBOX_GID}" "${SSH_AUTH_SOCK}"
+            fi
+
+            {
+                echo "engine=container"
+                echo "name=${APPLEBOX_CONTAINER_NAME:-}"
+                echo "image=${APPLEBOX_IMAGE:-}"
+                echo "rootless=1"
+            } > /run/.containerenv
+
+            if [ -x /sbin/init ]; then
+                exec /sbin/init
+            else
+                exec sleep infinity
+            fi
+        fi
+        """
+
+    /// The create-user script source, embedded as a string constant.
+    static let createUserScriptSource = """
+        #!/bin/sh
+        #
+        # First-time container user setup. Distro-agnostic by directly manipulating
+        # /etc/group, /etc/passwd, and /etc/shadow rather than relying on
+        # image-specific tools (useradd, adduser, etc.).
+        #
+
+        set -e
+
+        if ! getent group "${APPLEBOX_GID}" >/dev/null 2>&1; then
+            echo "${APPLEBOX_USER}:x:${APPLEBOX_GID}:" >> /etc/group
+        fi
+
+        if ! getent passwd "${APPLEBOX_UID}" >/dev/null 2>&1; then
+            echo "${APPLEBOX_USER}:x:${APPLEBOX_UID}:${APPLEBOX_GID}::${APPLEBOX_HOME}:${CONTAINER_SHELL}" >> /etc/passwd
+            echo "${APPLEBOX_USER}:!:19000:0:99999:7:::" >> /etc/shadow
+        fi
+
+        mkdir -p "${APPLEBOX_HOME}"
+        if [ -d /etc/skel ]; then
+            cp -a /etc/skel/. "${APPLEBOX_HOME}"
+        fi
+        chown -R "${APPLEBOX_UID}:${APPLEBOX_GID}" "${APPLEBOX_HOME}"
+
+        mkdir -p /etc/sudoers.d
+        echo "${APPLEBOX_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/applebox
+        chmod 440 /etc/sudoers.d/applebox
+        """
 }

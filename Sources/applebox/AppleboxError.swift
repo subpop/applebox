@@ -17,7 +17,7 @@ import Foundation
 public enum AppleboxError: Error, Sendable {
     case builtinNetworkNotPresent
     case containerInvalidState(String)
-    case initializationTimeout(String)
     case invalidRelease(String)
     case mutuallyExclusiveFlags(String)
+    case userSetupFailed(String)
 }
