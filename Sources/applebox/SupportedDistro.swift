@@ -38,12 +38,12 @@ public enum SupportedDistro: String, CaseIterable, ExpressibleByArgument, Sendab
 
     public var defaultRelease: String {
         switch self {
-        case .fedora: "43"
+        case .fedora: "44"
         case .ubuntu: "24.04"
         case .arch: "latest"
         case .rhel: "10.0"
         case .alpine: "3.22"
-        case .almalinux: "9"
+        case .almalinux: "10"
         case .amazonlinux: "2023"
         case .centos: "stream10"
         case .debian: "13"
